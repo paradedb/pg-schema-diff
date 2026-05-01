@@ -1,6 +1,9 @@
 // Copyright 2020-2026 Eric B. Ridge <eebbrr@gmail.com>. All rights reserved. Use
 // of this source code is governed by the Postgres license that can be found in
 // the LICENSE file.
+
+use std::process::exit;
+
 use crate::schema_set::{SchemaSet, Sql, SqlIdent};
 use postgres_parser::*;
 
@@ -36,6 +39,29 @@ fn main() {
             println!("{}", differences);
         }
 
+        "validate" => {
+            let a = args.get(2).expect("no a filename");
+            let b = args.get(3).expect("no b filename");
+            let u = args.get(4).expect("no upgrade filename");
+
+            let mut a_set = SchemaSet::new();
+            let mut b_set = SchemaSet::new();
+            let mut u_set = SchemaSet::new();
+
+            a_set.scan_file(&a);
+            b_set.scan_file(&b);
+            u_set.scan_file(&u);
+
+            match a_set.validate_upgrade(&b_set, &u_set) {
+                Ok(()) => exit(0),
+                Err(report) => {
+                    eprintln!(" -- differences found add the following -- ");
+                    print!("{}", report);
+                    exit(1)
+                }
+            }
+        }
+
         unknown => panic!("unrecognized command argument: {}", unknown),
     }
 }
@@ -67,7 +93,7 @@ pub fn make_name(names: &Option<Vec<Node>>) -> Result<String, PgParserError> {
                     crate::Node::Value(value) if value.string.is_some() => {
                         // let ident = value.string.sql_ident();
                         // if &ident != "pg_catalog" {
-                            result.push_str(&value.string.sql_ident());
+                        result.push_str(&value.string.sql_ident());
                         // }
                     }
                     crate::Node::A_Star(a_star) => {

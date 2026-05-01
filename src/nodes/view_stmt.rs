@@ -1,7 +1,7 @@
 // Copyright 2020-2026 Eric B. Ridge <eebbrr@gmail.com>. All rights reserved. Use
 // of this source code is governed by the Postgres license that can be found in
 // the LICENSE file.
-use crate::schema_set::{Diff, Len, Sql, SqlList};
+use crate::schema_set::{simple_identity, Diff, Len, Sql, SqlList};
 use postgres_parser::nodes::ViewStmt;
 use postgres_parser::Node;
 
@@ -44,5 +44,9 @@ impl Diff for ViewStmt {
 
     fn object_type(&self) -> String {
         "VIEW".into()
+    }
+
+    fn schema_object_identities(&self) -> Vec<String> {
+        vec![simple_identity("VIEW", &self.view.sql())]
     }
 }

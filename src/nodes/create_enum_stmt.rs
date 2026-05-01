@@ -1,7 +1,7 @@
 // Copyright 2020-2026 Eric B. Ridge <eebbrr@gmail.com>. All rights reserved. Use
 // of this source code is governed by the Postgres license that can be found in
 // the LICENSE file.
-use crate::schema_set::{Diff, Sql, SqlIdent, SqlList};
+use crate::schema_set::{simple_identity, Diff, Sql, SqlIdent, SqlList};
 use postgres_parser::nodes::CreateEnumStmt;
 
 impl Sql for CreateEnumStmt {
@@ -30,5 +30,9 @@ impl Diff for CreateEnumStmt {
 
     fn object_type(&self) -> String {
         "ENUM".into()
+    }
+
+    fn schema_object_identities(&self) -> Vec<String> {
+        vec![simple_identity("TYPE", &self.typeName.sql_ident())]
     }
 }

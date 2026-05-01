@@ -1,7 +1,7 @@
 // Copyright 2020-2026 Eric B. Ridge <eebbrr@gmail.com>. All rights reserved. Use
 // of this source code is governed by the Postgres license that can be found in
 // the LICENSE file.
-use crate::schema_set::{Diff, Sql};
+use crate::schema_set::{cast_identity, Diff, Sql};
 use postgres_parser::nodes::CreateCastStmt;
 
 impl Sql for CreateCastStmt {
@@ -38,5 +38,9 @@ impl Diff for CreateCastStmt {
             self.sourcetype.sql(),
             self.targettype.sql()
         ))
+    }
+
+    fn schema_object_identities(&self) -> Vec<String> {
+        vec![cast_identity(&self.sourcetype.sql(), &self.targettype.sql())]
     }
 }

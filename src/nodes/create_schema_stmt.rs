@@ -1,7 +1,7 @@
 // Copyright 2020-2026 Eric B. Ridge <eebbrr@gmail.com>. All rights reserved. Use
 // of this source code is governed by the Postgres license that can be found in
 // the LICENSE file.
-use crate::schema_set::{Diff, Sql, SqlIdent};
+use crate::schema_set::{simple_identity, Diff, Sql, SqlIdent};
 use postgres_parser::nodes::CreateSchemaStmt;
 use postgres_parser::Node;
 
@@ -56,5 +56,9 @@ impl Diff for CreateSchemaStmt {
 
     fn object_type(&self) -> String {
         "SCHEMA".into()
+    }
+
+    fn schema_object_identities(&self) -> Vec<String> {
+        vec![simple_identity("SCHEMA", &self.schemaname.sql_ident())]
     }
 }

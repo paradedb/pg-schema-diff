@@ -1,10 +1,12 @@
 // Copyright 2020-2026 Eric B. Ridge <eebbrr@gmail.com>. All rights reserved. Use
 // of this source code is governed by the Postgres license that can be found in
 // the LICENSE file.
-use std::cmp::Ordering;
-use crate::schema_set::{Diff, Sql, SqlCollect, SqlIdent, SqlList};
+use crate::schema_set::{
+    function_identity, function_input_signature, Diff, Sql, SqlCollect, SqlIdent, SqlList,
+};
 use crate::{make_name, EMPTY_NODE_VEC};
 use postgres_parser::nodes::CreateFunctionStmt;
+use std::cmp::Ordering;
 
 use postgres_parser::sys::FunctionParameterMode::FUNC_PARAM_TABLE;
 use postgres_parser::Node;
@@ -73,9 +75,9 @@ impl Sql for CreateFunctionStmt {
                     }
 
                     Ordering::Equal
-                },
+                }
 
-                _ => Ordering::Equal
+                _ => Ordering::Equal,
             });
             orig_options = Some(options);
         }
@@ -143,35 +145,29 @@ impl Diff for CreateFunctionStmt {
     }
 
     fn object_name(&self) -> Option<String> {
-        let name = make_name(&self.funcname).expect("unable to make name for CreateFunctionStatement");
-        Some(name + &input_signature(self))
+        let name =
+            make_name(&self.funcname).expect("unable to make name for CreateFunctionStatement");
+        Some(name + &function_input_signature(self.parameters.as_ref().unwrap_or(&EMPTY_NODE_VEC)))
     }
 
     fn object_type(&self) -> String {
         "FUNCTION".into()
     }
-}
 
-// Type-only input parameter list, used as the function's identity.
-// Matches Postgres overload semantics: function identity is name + input
-// argument types. Parameter names and defaults are stripped so they don't
-// participate in the match.
-fn input_signature(stmt: &CreateFunctionStmt) -> String {
-    stmt.parameters
-        .as_ref()
-        .unwrap_or(&EMPTY_NODE_VEC)
-        .iter()
-        .filter(|p| matches!(p, Node::FunctionParameter(param) if param.mode != FUNC_PARAM_TABLE))
-        .map(|node| match node {
-            Node::FunctionParameter(fp) => {
-                let mut fp = fp.clone();
-                fp.name = None;
-                fp.defexpr = None;
-                Node::FunctionParameter(fp)
-            }
-            _ => unreachable!(),
-        })
-        .sql_wrap("(", ")")
+    fn schema_object_identities(&self) -> Vec<String> {
+        let kind = if self.is_procedure {
+            "PROCEDURE"
+        } else {
+            "FUNCTION"
+        };
+        let name =
+            make_name(&self.funcname).expect("unable to make name for CreateFunctionStatement");
+        vec![function_identity(
+            kind,
+            &name,
+            self.parameters.as_ref().unwrap_or(&EMPTY_NODE_VEC),
+        )]
+    }
 }
 
 fn return_signature(stmt: &CreateFunctionStmt) -> String {

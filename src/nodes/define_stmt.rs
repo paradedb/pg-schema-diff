@@ -1,7 +1,7 @@
 // Copyright 2020-2026 Eric B. Ridge <eebbrr@gmail.com>. All rights reserved. Use
 // of this source code is governed by the Postgres license that can be found in
 // the LICENSE file.
-use crate::schema_set::{Diff, Len, Sql, SqlIdent, SqlList};
+use crate::schema_set::{operator_identity, simple_identity, Diff, Len, Sql, SqlIdent, SqlList};
 use postgres_parser::nodes::DefineStmt;
 use postgres_parser::sys::ObjectType;
 use postgres_parser::Node;
@@ -285,6 +285,42 @@ impl Diff for DefineStmt {
 
     fn object_type(&self) -> String {
         self.kind.sql()
+    }
+
+    fn schema_object_identities(&self) -> Vec<String> {
+        let id = match self.kind {
+            ObjectType::OBJECT_OPERATOR => {
+                // The parser doesn't preserve the input ordering of the
+                // DefElems (LEFTARG / RIGHTARG / FUNCTION / ...), so search
+                // by defname rather than relying on positional indexing.
+                let mut leftarg = String::new();
+                let mut rightarg = String::new();
+                for node in self.definition.iter().flatten() {
+                    if let Node::DefElem(de) = node {
+                        match de.defname.as_deref() {
+                            Some("leftarg") => {
+                                leftarg = de.arg.as_ref().map(|a| a.sql()).unwrap_or_default();
+                            }
+                            Some("rightarg") => {
+                                rightarg = de.arg.as_ref().map(|a| a.sql()).unwrap_or_default();
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                operator_identity(&self.defnames.sql_ident(), &leftarg, &rightarg)
+            }
+            // Catch-all covers AGGREGATE, COLLATION, CONVERSION, TS*, etc.
+            // Asymmetry: `DropStmt::schema_object_identities` only emits
+            // identities for OPERATOR / AGGREGATE / FUNCTION / PROCEDURE /
+            // CAST / SCHEMA / TYPE / VIEW. CREATE-side identities for the
+            // other kinds (e.g. COLLATION) won't match a corresponding DROP
+            // in an upgrade script, so the validator will report the drop
+            // as missing. Also, AGGREGATE here uses name only (no signature),
+            // so overloaded aggregates collide.
+            _ => simple_identity(&self.kind.sql(), &self.defnames.sql_ident()),
+        };
+        vec![id]
     }
 
     fn identifier<'a>(&self, tree_string: &'a str) -> Cow<'a, str> {
