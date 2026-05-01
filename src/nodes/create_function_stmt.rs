@@ -88,6 +88,17 @@ impl Sql for CreateFunctionStmt {
 
 impl Diff for CreateFunctionStmt {
     fn alter_stmt(&self, other: &Node) -> Option<String> {
+        if let Node::CreateFunctionStmt(other_stmt) = other {
+            // CREATE OR REPLACE preserves the function's OID so dependent
+            // objects (views, triggers, other functions) survive. Postgres
+            // forbids it when the return type — or RETURNS TABLE column
+            // types — change, so fall back to drop+create in that case.
+            if return_signature(self) == return_signature(other_stmt) {
+                let mut replaced = other_stmt.clone();
+                replaced.replace = true;
+                return Some(replaced.sql());
+            }
+        }
         let mut alter = String::new();
         alter.push_str(&self.drop_stmt().unwrap());
         alter.push_str(";\n");
@@ -132,28 +143,52 @@ impl Diff for CreateFunctionStmt {
     }
 
     fn object_name(&self) -> Option<String> {
-        let mut as_ = String::new();
-        let mut is_c = false;
-        for opt in self.options.iter().flatten() {
-            if let Node::DefElem(defelem) = opt {
-                if defelem.defname.as_ref().unwrap().eq_ignore_ascii_case("as") {
-                    as_ = defelem.sql();
-                    break;
-                } else if defelem.defname.as_ref().unwrap().eq_ignore_ascii_case("language") {
-                    is_c = true;
-                }
-            }
-        }
-
         let name = make_name(&self.funcname).expect("unable to make name for CreateFunctionStatement");
-        if is_c {
-            Some(name + &as_)
-        } else {
-            Some(name)
-        }
+        Some(name + &input_signature(self))
     }
 
     fn object_type(&self) -> String {
         "FUNCTION".into()
     }
+}
+
+// Type-only input parameter list, used as the function's identity.
+// Matches Postgres overload semantics: function identity is name + input
+// argument types. Parameter names and defaults are stripped so they don't
+// participate in the match.
+fn input_signature(stmt: &CreateFunctionStmt) -> String {
+    stmt.parameters
+        .as_ref()
+        .unwrap_or(&EMPTY_NODE_VEC)
+        .iter()
+        .filter(|p| matches!(p, Node::FunctionParameter(param) if param.mode != FUNC_PARAM_TABLE))
+        .map(|node| match node {
+            Node::FunctionParameter(fp) => {
+                let mut fp = fp.clone();
+                fp.name = None;
+                fp.defexpr = None;
+                Node::FunctionParameter(fp)
+            }
+            _ => unreachable!(),
+        })
+        .sql_wrap("(", ")")
+}
+
+fn return_signature(stmt: &CreateFunctionStmt) -> String {
+    let table_cols = stmt
+        .parameters
+        .as_ref()
+        .unwrap_or(&EMPTY_NODE_VEC)
+        .iter()
+        .filter(|p| matches!(p, Node::FunctionParameter(param) if param.mode == FUNC_PARAM_TABLE))
+        .map(|node| match node {
+            Node::FunctionParameter(fp) => {
+                let mut fp = fp.clone();
+                fp.defexpr = None;
+                Node::FunctionParameter(fp)
+            }
+            _ => unreachable!(),
+        })
+        .sql_wrap("(", ")");
+    format!("{}|{}", stmt.returnType.sql(), table_cols)
 }
