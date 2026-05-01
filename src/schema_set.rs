@@ -852,6 +852,26 @@ mod tests {
     }
 
     #[test]
+    fn diff_drops_operator_does_not_reference_function_name() {
+        // Regression: previously, OPERATOR drop_stmt used positional
+        // indexing that picked up FUNCTION instead of RIGHTARG when the
+        // parser reordered the DefElems.
+        let a = parse("CREATE OPERATOR === (LEFTARG = int, RIGHTARG = int, FUNCTION = int4eq);");
+        let b = parse("");
+        let diff_output = a.diff(&b);
+        assert!(
+            diff_output.contains("DROP OPERATOR"),
+            "expected DROP OPERATOR; got:\n{}",
+            diff_output
+        );
+        assert!(
+            !diff_output.contains("int4eq"),
+            "DROP OPERATOR should not reference the function name; got:\n{}",
+            diff_output
+        );
+    }
+
+    #[test]
     fn procedure_added_satisfied_by_create() {
         let b = "CREATE PROCEDURE p(x int) LANGUAGE sql AS $$ SELECT 1 $$;";
         let upgrade = "CREATE PROCEDURE p(x int) LANGUAGE sql AS $$ SELECT 1 $$;";
