@@ -206,14 +206,14 @@ impl Diff for DefineStmt {
                     (Some(mine), Some(theirs)) if mine != theirs => {
                         sql.push_str(&format!(
                             "ALTER OPERATOR {}{args} SET (RESTRICT = {});\n",
-                            self.defnames.sql_ident(),
+                            self.defnames.sql("."),
                             theirs.sql()
                         ));
                     }
                     (Some(_), None) => {
                         sql.push_str(&format!(
                             "ALTER OPERATOR {}{args} SET (RESTRICT = NONE);\n",
-                            self.defnames.sql_ident()
+                            self.defnames.sql(".")
                         ));
                     }
                     _ => {}
@@ -223,14 +223,14 @@ impl Diff for DefineStmt {
                     (Some(mine), Some(theirs)) if mine != theirs => {
                         sql.push_str(&format!(
                             "ALTER OPERATOR {}{args} SET (JOIN = {});\n",
-                            self.defnames.sql_ident(),
+                            self.defnames.sql("."),
                             theirs.sql()
                         ));
                     }
                     (Some(_), None) => {
                         sql.push_str(&format!(
                             "ALTER OPERATOR {}{args} SET (JOIN = NONE);\n",
-                            self.defnames.sql_ident()
+                            self.defnames.sql(".")
                         ));
                     }
                     _ => {}
@@ -263,7 +263,7 @@ impl Diff for DefineStmt {
 
                 let sql = format!(
                     "DROP OPERATOR IF EXISTS {}({}, {})",
-                    self.defnames.sql_ident(),
+                    self.defnames.sql("."),
                     leftarg.arg.as_ref().unwrap().sql(),
                     rightarg.arg.as_ref().unwrap().sql()
                 );
