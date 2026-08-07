@@ -10,6 +10,9 @@ impl Sql for GrantStmt {
         let mut sql = String::new();
 
         sql.push_str(if self.is_grant { "GRANT " } else { "REVOKE " });
+        if self.grant_option && !self.is_grant {
+            sql.push_str("GRANT OPTION FOR ");
+        }
         if self.privileges.is_none() {
             sql.push_str("ALL PRIVILEGES")
         } else {
@@ -30,10 +33,10 @@ impl Sql for GrantStmt {
         sql.push(' ');
 
         sql.push_str(&self.objects.sql(", "));
-        sql.push_str(" TO ");
+        sql.push_str(if self.is_grant { " TO " } else { " FROM " });
         sql.push_str(&self.grantees.sql(", "));
 
-        if self.grant_option {
+        if self.grant_option && self.is_grant {
             sql.push_str(" WITH GRANT OPTION");
         }
 
@@ -41,4 +44,14 @@ impl Sql for GrantStmt {
     }
 }
 
-impl Diff for GrantStmt {}
+impl Diff for GrantStmt {
+    /// Dropping a GRANT means REVOKEing it (and vice versa), so emit this
+    /// statement's inverse.  Drops are emitted before adds, so narrowing a
+    /// grant produces the REVOKE/GRANT pair a migration needs.
+    fn drop_stmt(&self) -> Option<String> {
+        let mut inverse = self.clone();
+        inverse.is_grant = !self.is_grant;
+        inverse.grant_option = false;
+        Some(inverse.sql())
+    }
+}
