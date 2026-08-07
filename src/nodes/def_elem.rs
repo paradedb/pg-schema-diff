@@ -32,6 +32,31 @@ impl Sql for DefElem {
                     sql.push_str("STRICT");
                 }
             }
+            // SECURITY DEFINER/INVOKER, [NOT] LEAKPROOF and WINDOW all parse
+            // into DefElems carrying an integer boolean, exactly like "strict"
+            // above. Without arms of their own they fall through to the generic
+            // `key = value` branch at the bottom and come back out as
+            // `security = 1`, `leakproof = 1` and `window = 1`, none of which
+            // Postgres can parse.
+            "security" => {
+                if get_bool_value(&self.arg.as_ref().unwrap()) {
+                    sql.push_str("SECURITY DEFINER");
+                } else {
+                    sql.push_str("SECURITY INVOKER");
+                }
+            }
+            "leakproof" => {
+                if get_bool_value(&self.arg.as_ref().unwrap()) {
+                    sql.push_str("LEAKPROOF");
+                } else {
+                    sql.push_str("NOT LEAKPROOF");
+                }
+            }
+            "window" => {
+                if get_bool_value(&self.arg.as_ref().unwrap()) {
+                    sql.push_str("WINDOW");
+                }
+            }
             "set" => {
                 sql.push_str(&self.arg.sql());
             }
