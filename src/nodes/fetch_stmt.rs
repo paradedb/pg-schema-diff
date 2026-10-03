@@ -18,7 +18,7 @@ impl Sql for FetchStmt {
             FetchDirection::FETCH_RELATIVE => sql.push_str("RELATIVE "),
         }
 
-        if self.howMany == std::i64::MAX {
+        if self.howMany == i64::MAX {
             sql.push_str("ALL");
         } else {
             sql.push_str(&self.howMany.to_string());
