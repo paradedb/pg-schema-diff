@@ -1,9 +1,0 @@
-[package]
-name = "bindgen"
-version = "0.57.0"
-edition = "2018"
-license = "BSD-3-Clause"
-publish = false
-
-[dependencies]
-bindgen-upstream = { package = "bindgen", version = "0.59.2", default-features = false, features = ["runtime"] }
