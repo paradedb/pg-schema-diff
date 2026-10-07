@@ -9,4 +9,7 @@ license = "LICENSE"
 colored = "2.0.0"
 indexmap = "2.5.0"
 postgres-parser = "*"
-rand = "0.8.3"
+rand = "0.8.6"
+
+[patch.crates-io]
+bindgen = { path = "patches/bindgen" }
